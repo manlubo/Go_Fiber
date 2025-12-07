@@ -4,6 +4,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 
 	"fiber/internal/module/board"
+	"fiber/internal/module/reply"
 	"fiber/internal/module/user"
 )
 
@@ -18,6 +19,10 @@ func main() {
 	// board
 	boardModule := board.InitializeBoardModule()
 	boardModule.Register(app)
+
+	// reply
+	replyModule := reply.InitializeReplyModule()
+	replyModule.Register(app)
 
 	app.Get("/", func(c *fiber.Ctx) error {
 		return c.JSON(map[string]interface{}{"message": "Hello, World!", "status": "success"})
