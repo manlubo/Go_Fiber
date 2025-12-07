@@ -5,6 +5,7 @@ import (
 	"fiber/internal/entity"
 	"fiber/internal/util"
 	"fmt"
+	"time"
 
 	driver "github.com/arangodb/go-driver"
 	"github.com/google/uuid"
@@ -27,6 +28,8 @@ func (r *BoardRepository) Create(board *entity.Board) error {
 
 	// ID 생성
 	board.ID = uuid.NewString()
+	board.CreatedAt = time.Now().Unix()
+	board.IsActive = true
 
 	_, err := r.col.CreateDocument(ctx, board)
 	if err != nil {
@@ -43,6 +46,8 @@ func (r *BoardRepository) FindByID(id string) (*entity.Board, error) {
 	query := `
 	FOR b IN @@col
 		FILTER b.id == @id
+		FILTER b.isDeleted == false
+		FILTER b.isActive == true
 		RETURN b
 	`
 
@@ -75,6 +80,8 @@ func (r *BoardRepository) List() ([]*entity.Board, error) {
 
 	query := `
 	FOR b IN @@col
+		FILTER b.isDeleted == false
+		FILTER b.isActive == true
 		RETURN b
 	`
 
@@ -112,11 +119,12 @@ func (r *BoardRepository) List() ([]*entity.Board, error) {
 func (r *BoardRepository) Update(id string, board *entity.Board) error {
 	ctx := context.Background()
 	fmt.Println("Update board: ", id, board.Title, board.Content)
-	patch := util.BuildPatch(board, "id")
+	patch := util.BuildPatch(board, "id", "userId", "createdAt", "isDeleted", "deletedAt")
 
 	query := `
 		FOR b In @@col
 			FILTER b.id == @id
+			FILTER b.isDeleted == false
 			UPDATE b WITH @patch IN @@col
 	`
 
@@ -144,12 +152,17 @@ func (r *BoardRepository) Delete(id string) error {
 	query := `
 		FOR b In @@col
 			FILTER b.id == @id
-			REMOVE { _key: b._key } IN @@col
+			UPDATE b WITH { 
+				isActive: false,
+				isDeleted: true,
+				deletedAt: @deletedAt
+				} IN @@col
 	`
 
 	bindVars := map[string]interface{}{
-		"@col": r.col.Name(),
-		"id":   id,
+		"@col":      r.col.Name(),
+		"id":        id,
+		"deletedAt": time.Now().Unix(),
 	}
 
 	cursor, err := r.col.Database().Query(ctx, query, bindVars)

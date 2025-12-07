@@ -5,6 +5,7 @@ import (
 	"fiber/internal/entity"
 	"fiber/internal/util"
 	"fmt"
+	"time"
 
 	driver "github.com/arangodb/go-driver"
 	"github.com/google/uuid"
@@ -27,6 +28,8 @@ func (r *UserRepository) Create(user *entity.User) error {
 
 	// ID 생성
 	user.ID = uuid.NewString()
+	user.CreatedAt = time.Now().Unix()
+	user.IsActive = true
 
 	_, err := r.col.CreateDocument(ctx, user)
 	if err != nil {
@@ -43,6 +46,8 @@ func (r *UserRepository) FindByID(id string) (*entity.User, error) {
 	query := `
 	FOR u IN @@col
 		FILTER u.id == @id
+		FILTER u.isDeleted == false
+		FILTER u.isActive == true
 		RETURN u
 	`
 
@@ -75,6 +80,8 @@ func (r *UserRepository) List() ([]*entity.User, error) {
 
 	query := `
 	FOR u IN @@col
+		FILTER u.isDeleted == false
+		FILTER u.isActive == true
 		RETURN u
 	`
 
@@ -112,7 +119,7 @@ func (r *UserRepository) List() ([]*entity.User, error) {
 func (r *UserRepository) Update(id string, user *entity.User) error {
 	ctx := context.Background()
 	fmt.Println("Update user: ", id, user.Name, user.Email)
-	patch := util.BuildPatch(user, "id")
+	patch := util.BuildPatch(user, "id", "createdAt", "isDeleted", "deletedAt")
 
 	query := `
 		FOR u In @@col
@@ -144,12 +151,17 @@ func (r *UserRepository) Delete(id string) error {
 	query := `
 		FOR u In @@col
 			FILTER u.id == @id
-			REMOVE { _key: u._key } IN @@col
+			UPDATE u WITH { 
+				isActive: false,
+				isDeleted: true,
+				deletedAt: @deletedAt
+				} IN @@col
 	`
 
 	bindVars := map[string]interface{}{
-		"@col": r.col.Name(),
-		"id":   id,
+		"@col":      r.col.Name(),
+		"id":        id,
+		"deletedAt": time.Now().Unix(),
 	}
 
 	cursor, err := r.col.Database().Query(ctx, query, bindVars)

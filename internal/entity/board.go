@@ -5,4 +5,5 @@ type Board struct {
 	UserID  string  `json:"userId"`
 	Title   *string `json:"title"`
 	Content *string `json:"content"`
+	BaseEntity
 }

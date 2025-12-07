@@ -2,6 +2,7 @@ package util
 
 import (
 	"reflect"
+	"time"
 )
 
 // BuildPatch: struct pointer를 받아서
@@ -50,6 +51,10 @@ func BuildPatch(input interface{}, skipFields ...string) map[string]interface{} 
 
 		patch[jsonTag] = fieldVal.Elem().Interface()
 	}
+
+	// 업데이트 시간 자동 반영
+	now := time.Now().Unix()
+	patch["updatedAt"] = now
 
 	return patch
 }
